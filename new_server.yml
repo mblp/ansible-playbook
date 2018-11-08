@@ -1,0 +1,57 @@
+---
+- hosts: new
+  remote_user: root
+  tasks:
+     
+    - name: Pushes configuration
+      copy: src=/etc/ansible/files/.bash_aliases dest=/root/.bash_aliases mode=0640 owner=root group=root
+
+    - name: Upgrade all packages to the latest version
+      become: true
+      apt:
+        upgrade: yes
+        update_cache: yes
+        cache_valid_time: 86400
+
+    - name: Installs necessary packages
+      apt:
+       name: "{{ packages }}"
+      vars:
+       packages:
+               - rsyslog
+               - htop
+               - fail2ban
+               - mc
+               - lrzsz
+               - iptables-persistent
+
+    - name: Pushes iptables configurations
+      copy: src=/etc/ansible/files/rules.v4 dest=/etc/iptables/rules.v4 mode=0640 owner=root group=root
+    
+    - name: Pushes ip6tables  
+      copy: src=/etc/ansible/files/rules.v6 dest=/etc/iptables/rules.v6 mode=0640 owner=root group=root
+
+    - name: Activate ip6tables configurations
+      raw: ip6tables-restore < /etc/iptables/rules.v6
+
+    - name: Activate iptables conf
+      raw: iptables-restore < /etc/iptables/rules.v4
+
+    - name: Log iptables to file
+      copy: src=/etc/ansible/files/30-iptables.conf dest=/etc/rsyslog.d/30-iptables.conf mode=0644 owner=root group=root
+      
+    - name: Rotate iptables logs  
+      copy: src=/etc/ansible/files/iptables-logrotate dest=/etc/logrotate.d/iptables mode=0644 owner=root group=root
+      
+    - name: Create log file for iptables logs  
+      copy:
+        content: ""
+        dest: /var/log/iptables.log
+        force: no
+        owner: syslog
+        mode: 0644
+
+    - name: Restart Rsyslogd
+      service: name=rsyslog state=restarted
+...
+# vim:ft=ansible:
